@@ -1,0 +1,96 @@
+---
+title: "Whythawk Analysis v1.0"
+output: html_notebook
+---
+
+```{r}
+install.packages(c("survival", "survminer"))
+```
+
+```{r}
+
+```
+
+
+##Read the Data in
+
+```{r}
+library(tidyverse)
+library(sf)
+library(tmap)
+library(survival)
+library(ranger)
+library(ggplot2)
+library(dplyr)
+library(ggfortify)
+library(survminer)
+```
+
+```{r}
+getwd()
+
+data_path <- "C:/Users/Adam/OneDrive - University College London/Research/Whythawk/new_merged_reports"
+
+sample <- read_csv(paste(data_path,"CamdenSample2021.csv", sep = "/"))
+camden_2021_03 <- read_csv(paste(data_path,"2021-03-E09000007-camden-location-report.csv", sep = "/"))
+camden_2020_12 <- read_csv(paste(data_path,"2020-12-E09000007-camden-location-report.csv", sep = "/"))
+camden_2020_09 <- read_csv(paste(data_path,"2020-09-E09000007-camden-location-report.csv", sep = "/"))
+camden_2020_06 <- read_csv(paste(data_path,"2020-06-E09000007-camden-location-report.csv", sep = "/"))
+camden_2020_03 <- read_csv(paste(data_path,"2020-03-E09000007-camden-location-report.csv", sep = "/"))
+
+open_uprn <- read_csv("./osopenuprn_202106_csv/osopenuprn_202105.csv")
+
+sub <- filter(open_uprn, between(UPRN, 5004360, 5004370))
+
+getwd()
+hampstead_survival <- read_csv("Hampstead-final-survival.csv")
+
+```
+
+```{r}
+hampstead_survival <- hampstead_survival %>% 
+  mutate(vacant_null = replace(vacant, vacant==0, NA)) %>% 
+  mutate(sub_cat_clean = str_replace_all(sub_category, "[[:punct:]]", " "))
+```
+
+
+```{r}
+spec(camden_2021_03)
+```
+
+```{r}
+# Kaplan Meier Survival Curve
+km <- with(hampstead_survival, Surv(survival, vacant_null))
+head(km,80)
+
+km_fit <- survfit(Surv(survival, vacant) ~ 1, data=hampstead_survival)
+summary(km_fit, times = c(1,30,60,90*(1:10)))
+autoplot(km_fit)
+```
+
+```{r}
+km_trt_fit <- survfit(Surv(survival, vacant) ~ category, data=hampstead_survival)
+ggsurvplot(km_trt_fit, data = hampstead_survival, conf.int = TRUE, risk.table = T, risk.table.height = 0.4, pval = T)
+```
+
+```{r}
+fit <- survfit(Surv(survival, vacant) ~ sub_category, data=hampstead_survival)
+summary(fit, times = c(1,30,60,90*(1:10)))
+ggsurv <- ggsurvplot(fit, data = hampstead_survival, conf.int = TRUE, risk.table = F, risk.table.height = 0.4, pval = T, legend = c(0.7, 0.2))
+ggsurv
+ggsave("ggsurv.png")
+
+```
+
+```{r}
+cox <- coxph(Surv(survival, vacant) ~ sub_category, data = hampstead_survival)
+summary(cox)
+ggforest(cox, data = hampstead_survival)
+
+
+```
+
+```{r}
+view("vet")
+```
+
